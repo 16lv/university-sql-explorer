@@ -160,7 +160,8 @@ class QueryExplorer:
         return [dict(r) for r in rows]
 
     def top_students_by_weighted_average(self, min_credits: int = 20) -> list[dict[str, Any]]:
-        # Multiply by 1.0 so SQLite does float division instead of truncating to an int
+        if min_credits < 0:
+            raise ValueError("min_credits must be non-negative.")
         rows = self._conn.execute(
             """
             SELECT
@@ -182,6 +183,11 @@ class QueryExplorer:
         return [dict(r) for r in rows]
 
     def explain_module_mark_lookup(self, module_code: str, min_mark: int) -> list[str]:
+        clean_code = module_code.strip().upper()
+        if not clean_code:
+            raise ValueError("module_code must not be blank.")
+        if not (0 <= min_mark <= 100):
+            raise ValueError("min_mark must be between 0 and 100.")
         rows = self._conn.execute(
             """
             EXPLAIN QUERY PLAN
@@ -189,6 +195,6 @@ class QueryExplorer:
             FROM enrolments
             WHERE module_code = ? AND mark >= ?
             """,
-            (module_code, min_mark),
+            (clean_code, min_mark),
         ).fetchall()
         return [str(r["detail"]) for r in rows]

@@ -46,3 +46,14 @@ def test_composite_index_is_used_by_query_planner() -> None:
 
     plan = explorer.explain_module_mark_lookup("CM2102", 70)
     assert any("idx_enrolments_module_mark" in detail for detail in plan)
+
+
+def test_query_explorer_validates_arguments_and_context_manager() -> None:
+    with QueryExplorer(":memory:") as explorer:
+        explorer.seed_sample_data()
+        with pytest.raises(ValueError, match="non-negative"):
+            explorer.top_students_by_weighted_average(min_credits=-5)
+        with pytest.raises(ValueError, match="between 0 and 100"):
+            explorer.explain_module_mark_lookup("CM2102", 120)
+        with pytest.raises(ValueError, match="must not be blank"):
+            explorer.explain_module_mark_lookup("   ", 50)
