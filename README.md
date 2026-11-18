@@ -1,26 +1,26 @@
 # university-sql-explorer
 
-Relational SQLite explorer for university student records, module enrolments, credit-weighted averages, and query-plan inspection using **Python 3.12**.
+Relational SQLite explorer for student records, module enrolments, credit-weighted averages, and index query-plan verification using **Python 3.12**.
 
 ## Design Notes
 
-- **3NF schema with constraints**: Models `departments`, `students`, `modules`, and `enrolments` with foreign keys (`PRAGMA foreign_keys = ON`) and `CHECK` constraints enforcing valid credit counts and marks (`0..100`).
-- **Pre-grouped aggregations**: `module_statistics()` and `top_students_by_weighted_average()` compute credit-weighted marks with explicit float arithmetic (`* 1.0`) and `HAVING` credit thresholds.
-- **Query-plan verification**: `explain_module_mark_lookup()` inspects SQLite's `EXPLAIN QUERY PLAN` output to confirm use of the composite `(module_code, mark)` index `idx_enrolments_module_mark`.
+- **3NF schema with constraints**: Models `departments`, `students`, `modules`, and `enrolments` with composite primary keys (`student_id, module_code, academic_year`), foreign keys (`PRAGMA foreign_keys = ON`), and `CHECK` bounds on credits, enrolment year, and marks (`0..100`).
+- **Write & aggregate helpers**: Provides validated `add_enrolment()` and `record_mark()` operations alongside `module_statistics()`, `department_summary()`, and `top_students_by_weighted_average()` (with float credit-weighted math and `HAVING` credit thresholds).
+- **Index verification**: `explain_module_mark_lookup()` checks `EXPLAIN QUERY PLAN` to verify lookup coverage via `idx_enrolments_module_mark`.
 
 ## Structure
 
 ```text
 university-sql-explorer/
 ├── src/sql_explorer/
-│   └── database.py     # Schema DDL, seed fixtures, analytical queries, EXPLAIN helper
+│   └── database.py     # Schema DDL, seed fixtures, writes, analytical queries, EXPLAIN helper
 ├── tests/
 │   └── test_database.py
 ├── pyproject.toml
 └── requirements.txt
 ```
 
-## Development
+## Quick Start
 
 ```bash
 pip install -e ".[dev]"

@@ -7,7 +7,7 @@ import pytest
 from src.sql_explorer.database import QueryExplorer
 
 
-def test_relational_joins_aggregations_and_constraints() -> None:
+def test_relational_joins_aggregations_and_department_summary() -> None:
     explorer = QueryExplorer(":memory:")
     explorer.seed_sample_data()
 
@@ -17,6 +17,10 @@ def test_relational_joins_aggregations_and_constraints() -> None:
     assert cm2102["average_mark"] == 76.33
     assert cm2102["min_mark"] == 66
     assert cm2102["max_mark"] == 85
+
+    depts = {d["code"]: d for d in explorer.department_summary()}
+    assert depts["COMSC"]["student_count"] == 3
+    assert depts["COMSC"]["module_count"] == 3
 
     transcript = explorer.student_transcript(240101)
     assert len(transcript) == 2
@@ -28,11 +32,27 @@ def test_relational_joins_aggregations_and_constraints() -> None:
     assert ranking[0]["weighted_average"] == 83.0
 
 
-def test_foreign_key_and_check_constraints_reject_invalid_rows() -> None:
+def test_enrolment_writes_mark_updates_and_constraint_enforcement() -> None:
     explorer = QueryExplorer(":memory:")
     explorer.seed_sample_data()
 
-    # Mark above 100 violates CHECK(mark BETWEEN 0 AND 100)
+    # Add an enrolment without a mark yet, then record the mark later
+    explorer.add_enrolment(240103, "CM2208", "2025/26")
+    explorer.record_mark(240103, "CM2208", "2025/26", 90)
+    transcript = explorer.student_transcript(240103)
+    assert any(row["module_code"] == "CM2208" and row["mark"] == 90 for row in transcript)
+
+    # Duplicate composite primary key should raise IntegrityError
+    with pytest.raises(sqlite3.IntegrityError):
+        explorer.add_enrolment(240103, "CM2208", "2025/26", 75)
+
+    # Mark bounds validation in Python and SQLite CHECK constraint
+    with pytest.raises(ValueError, match="between 0 and 100"):
+        explorer.add_enrolment(240101, "MA2001", "2026/27", mark=145)
+
+    with pytest.raises(LookupError):
+        explorer.record_mark(240101, "MISSING", "2025/26", 70)
+
     with pytest.raises(sqlite3.IntegrityError):
         explorer._conn.execute(
             "INSERT INTO enrolments (student_id, module_code, academic_year, mark) VALUES (?, ?, ?, ?)",

@@ -49,12 +49,11 @@ CREATE INDEX IF NOT EXISTS idx_students_department
 
 
 class QueryExplorer:
-    # Small SQLite wrapper for testing university schema constraints, joins, and query plans.
+    """SQLite wrapper exploring university schemas, constraints, aggregations, and query plans."""
 
     def __init__(self, db_path: str | Path = ":memory:") -> None:
         self._conn = sqlite3.connect(str(db_path))
         self._conn.row_factory = sqlite3.Row
-        # SCHEMA_SQL turns on PRAGMA foreign_keys = ON and sets up the 4 tables
         self._conn.executescript(SCHEMA_SQL)
         self._conn.commit()
 
@@ -71,8 +70,8 @@ class QueryExplorer:
         self._conn.executemany(
             "INSERT OR IGNORE INTO departments (code, name, building) VALUES (?, ?, ?)",
             [
-                ("COMSC", "School of Computer Science and Informatics", "Abacws"),
-                ("MATHS", "School of Mathematics", "Abacws"),
+                ("COMSC", "Computer Science and Informatics", "North Wing"),
+                ("MATHS", "Mathematics", "South Wing"),
             ],
         )
         self._conn.executemany(
@@ -82,10 +81,10 @@ class QueryExplorer:
             ) VALUES (?, ?, ?, ?, ?)
             """,
             [
-                (240101, "Alex Morgan", "morgana@cardiff.ac.uk", "COMSC", 2024),
-                (240102, "Samira Patel", "patels@cardiff.ac.uk", "COMSC", 2024),
-                (240103, "Liam Evans", "evansl@cardiff.ac.uk", "COMSC", 2023),
-                (240104, "Hannah Rees", "reesh@cardiff.ac.uk", "MATHS", 2024),
+                (240101, "Alex Morgan", "morgana@university.example", "COMSC", 2024),
+                (240102, "Samira Patel", "patels@university.example", "COMSC", 2024),
+                (240103, "Liam Evans", "evansl@university.example", "COMSC", 2023),
+                (240104, "Hannah Rees", "reesh@university.example", "MATHS", 2024),
             ],
         )
         self._conn.executemany(
@@ -118,6 +117,55 @@ class QueryExplorer:
         )
         self._conn.commit()
 
+    def add_enrolment(
+        self,
+        student_id: int,
+        module_code: str,
+        academic_year: str,
+        mark: int | None = None,
+    ) -> None:
+        clean_code = module_code.strip().upper()
+        clean_year = academic_year.strip()
+        if not clean_code or not clean_year:
+            raise ValueError("module_code and academic_year must not be blank.")
+        if mark is not None and not (0 <= mark <= 100):
+            raise ValueError("mark must be between 0 and 100.")
+        with self._conn:
+            self._conn.execute(
+                """
+                INSERT INTO enrolments (student_id, module_code, academic_year, mark)
+                VALUES (?, ?, ?, ?)
+                """,
+                (student_id, clean_code, clean_year, mark),
+            )
+
+    def record_mark(
+        self,
+        student_id: int,
+        module_code: str,
+        academic_year: str,
+        mark: int,
+    ) -> None:
+        clean_code = module_code.strip().upper()
+        clean_year = academic_year.strip()
+        if not clean_code or not clean_year:
+            raise ValueError("module_code and academic_year must not be blank.")
+        if not (0 <= mark <= 100):
+            raise ValueError("mark must be between 0 and 100.")
+        with self._conn:
+            cur = self._conn.execute(
+                """
+                UPDATE enrolments
+                SET mark = ?
+                WHERE student_id = ? AND module_code = ? AND academic_year = ?
+                """,
+                (mark, student_id, clean_code, clean_year),
+            )
+            if cur.rowcount == 0:
+                raise LookupError(
+                    f"No enrolment found for student {student_id} in {clean_code} ({clean_year})."
+                )
+
     def module_statistics(self) -> list[dict[str, Any]]:
         rows = self._conn.execute(
             """
@@ -134,6 +182,33 @@ class QueryExplorer:
             LEFT JOIN enrolments e ON e.module_code = m.module_code
             GROUP BY m.module_code, m.title, d.name
             ORDER BY m.module_code ASC
+            """
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def department_summary(self) -> list[dict[str, Any]]:
+        rows = self._conn.execute(
+            """
+            WITH student_counts AS (
+                SELECT department_code, COUNT(*) AS student_count
+                FROM students
+                GROUP BY department_code
+            ),
+            module_counts AS (
+                SELECT department_code, COUNT(*) AS module_count
+                FROM modules
+                GROUP BY department_code
+            )
+            SELECT
+                d.code,
+                d.name,
+                d.building,
+                COALESCE(s.student_count, 0) AS student_count,
+                COALESCE(m.module_count, 0) AS module_count
+            FROM departments d
+            LEFT JOIN student_counts s ON s.department_code = d.code
+            LEFT JOIN module_counts m ON m.department_code = d.code
+            ORDER BY d.code ASC
             """
         ).fetchall()
         return [dict(r) for r in rows]
