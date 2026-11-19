@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import argparse
+import json
 import sqlite3
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Self
 
@@ -54,6 +57,7 @@ class QueryExplorer:
     def __init__(self, db_path: str | Path = ":memory:") -> None:
         self._conn = sqlite3.connect(str(db_path))
         self._conn.row_factory = sqlite3.Row
+        self._conn.execute("PRAGMA foreign_keys = ON;")
         self._conn.executescript(SCHEMA_SQL)
         self._conn.commit()
 
@@ -273,3 +277,30 @@ class QueryExplorer:
             (clean_code, min_mark),
         ).fetchall()
         return [str(r["detail"]) for r in rows]
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Run relational SQL rollups and index-plan checks against sample academic data."
+    )
+    parser.add_argument(
+        "--db",
+        default=":memory:",
+        help="Optional SQLite file path (default: in-memory seeded snapshot)",
+    )
+    args = parser.parse_args(argv)
+
+    with QueryExplorer(args.db) as explorer:
+        explorer.seed_sample_data()
+        payload = {
+            "departments": explorer.department_summary(),
+            "modules": explorer.module_statistics(),
+            "weighted_ranking": explorer.top_students_by_weighted_average(min_credits=20),
+            "query_plan_cm2102": explorer.explain_module_mark_lookup("CM2102", 70),
+        }
+        print(json.dumps(payload, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

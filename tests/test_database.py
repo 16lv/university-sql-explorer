@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 
 import pytest
 
-from src.sql_explorer.database import QueryExplorer
+from sql_explorer.database import QueryExplorer, main
 
 
 def test_relational_joins_aggregations_and_department_summary() -> None:
@@ -77,3 +78,12 @@ def test_query_explorer_validates_arguments_and_context_manager() -> None:
             explorer.explain_module_mark_lookup("CM2102", 120)
         with pytest.raises(ValueError, match="must not be blank"):
             explorer.explain_module_mark_lookup("   ", 50)
+
+
+def test_cli_runner_emits_department_module_and_query_plan(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main([]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert len(payload["departments"]) == 2
+    assert any("idx_enrolments_module_mark" in row for row in payload["query_plan_cm2102"])
