@@ -87,3 +87,12 @@ def test_cli_runner_emits_department_module_and_query_plan(
     payload = json.loads(capsys.readouterr().out)
     assert len(payload["departments"]) == 2
     assert any("idx_enrolments_module_mark" in row for row in payload["query_plan_cm2102"])
+
+
+def test_module_mark_distribution_counts_grade_bands() -> None:
+    with QueryExplorer(":memory:") as explorer:
+        explorer.seed_sample_data()
+        dist = explorer.module_mark_distribution("CM2102")
+        assert dist["first_class"] == 2
+        assert dist["upper_second"] == 1
+        assert dist["fail"] == 0

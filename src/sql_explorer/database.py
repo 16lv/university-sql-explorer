@@ -278,6 +278,36 @@ class QueryExplorer:
         ).fetchall()
         return [str(r["detail"]) for r in rows]
 
+    def module_mark_distribution(self, module_code: str) -> dict[str, int]:
+        clean_code = module_code.strip().upper()
+        if not clean_code:
+            raise ValueError("module_code must not be blank.")
+        row = self._conn.execute(
+            """
+            SELECT
+                COALESCE(SUM(CASE WHEN mark >= 70 THEN 1 ELSE 0 END), 0) AS first_class,
+                COALESCE(SUM(CASE WHEN mark BETWEEN 60 AND 69 THEN 1 ELSE 0 END), 0) AS upper_second,
+                COALESCE(SUM(CASE WHEN mark BETWEEN 50 AND 59 THEN 1 ELSE 0 END), 0) AS lower_second,
+                COALESCE(SUM(CASE WHEN mark BETWEEN 40 AND 49 THEN 1 ELSE 0 END), 0) AS third_or_pass,
+                COALESCE(SUM(CASE WHEN mark < 40 THEN 1 ELSE 0 END), 0) AS fail,
+                COALESCE(SUM(CASE WHEN mark IS NULL THEN 1 ELSE 0 END), 0) AS unmarked
+            FROM enrolments
+            WHERE module_code = ?
+            """,
+            (clean_code,),
+        ).fetchone()
+        bands = (
+            "first_class",
+            "upper_second",
+            "lower_second",
+            "third_or_pass",
+            "fail",
+            "unmarked",
+        )
+        if row is None:
+            return {band: 0 for band in bands}
+        return {band: int(row[band]) for band in bands}
+
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(

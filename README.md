@@ -10,7 +10,7 @@ Normalised academic relational database, credit-weighted aggregation queries, an
 
 - **Enforced schema rules**: Restricts credits to `10` / `20` / `40`, marks to `0..100` (or `NULL`), and enrolment years to `2018..2030`, with `PRAGMA foreign_keys = ON` active from connection init.
 - **Validated writes**: `add_enrolment()` and `record_mark()` normalise module codes and guard mark bounds in Python before executing SQLite transactions.
-- **Weighted academic rollups**: `top_students_by_weighted_average()` weights module marks by credit value and `department_summary()` joins pre-aggregated CTEs so student and module counts do not cross-multiply.
+- **Weighted academic rollups & grade bands**: `top_students_by_weighted_average()` weights module marks by credit value, `department_summary()` joins pre-aggregated CTEs so student and module counts do not cross-multiply, and `module_mark_distribution()` summarises UK degree classification counts (`first_class`, `upper_second`, `lower_second`, `third_or_pass`, `fail`, `unmarked`).
 - **Index plan verification**: `explain_module_mark_lookup()` inspects SQLite's `EXPLAIN QUERY PLAN` output to confirm the composite index `idx_enrolments_module_mark` covers threshold lookups.
 
 ## Technology Stack
