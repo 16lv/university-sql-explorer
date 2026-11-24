@@ -27,10 +27,11 @@ pip install -e ".[dev]"
 
 ## Usage Examples
 
-Run the built-in CLI against a fresh seeded in-memory database:
+Run the built-in CLI against a fresh seeded in-memory database, or pass `--db <path> --seed --module CM2102`:
 
 ```bash
 university-sql-explorer
+university-sql-explorer --db academic.db --seed --module CM2102
 ```
 
 Or drive `QueryExplorer` directly in Python:
@@ -72,5 +73,5 @@ pytest -v
 
 ## Known Limitations & Future Improvements
 
-- `seed_sample_data()` is idempotent on sample keys via `INSERT OR IGNORE`/`REPLACE`; separating CLI seeding from production usage via an explicit `--seed` flag would keep empty custom DBs untouched.
+- `seed_sample_data()` is gated behind `:memory:` or explicit `--seed` on disk files; adding versioned migration scripts would complement schema evolution.
 - Targets SQLite syntax directly; PostgreSQL port would replace `INTEGER PRIMARY KEY` and `PRAGMA` statements with sequences and foreign-key defaults.

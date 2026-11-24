@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from pathlib import Path
 
 import pytest
 
@@ -96,3 +97,17 @@ def test_module_mark_distribution_counts_grade_bands() -> None:
         assert dist["first_class"] == 2
         assert dist["upper_second"] == 1
         assert dist["fail"] == 0
+
+
+def test_cli_custom_db_respects_seed_flag_and_module_distribution(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    db_file = tmp_path / "academic.db"
+    assert main(["--db", str(db_file)]) == 0
+    unseeded = json.loads(capsys.readouterr().out)
+    assert unseeded["departments"] == []
+
+    assert main(["--db", str(db_file), "--seed", "--module", "CM2102"]) == 0
+    seeded = json.loads(capsys.readouterr().out)
+    assert len(seeded["departments"]) == 2
+    assert seeded["mark_distribution"]["CM2102"]["first_class"] == 2

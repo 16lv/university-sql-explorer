@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Self
@@ -318,18 +319,35 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=":memory:",
         help="Optional SQLite file path (default: in-memory seeded snapshot)",
     )
+    parser.add_argument(
+        "--seed",
+        action="store_true",
+        help="Seed sample academic records (enabled automatically for :memory:)",
+    )
+    parser.add_argument(
+        "--module",
+        default="CM2102",
+        help="Module code to inspect for mark distribution and query plan (default: CM2102)",
+    )
     args = parser.parse_args(argv)
 
-    with QueryExplorer(args.db) as explorer:
-        explorer.seed_sample_data()
-        payload = {
-            "departments": explorer.department_summary(),
-            "modules": explorer.module_statistics(),
-            "weighted_ranking": explorer.top_students_by_weighted_average(min_credits=20),
-            "query_plan_cm2102": explorer.explain_module_mark_lookup("CM2102", 70),
-        }
-        print(json.dumps(payload, indent=2))
-    return 0
+    try:
+        with QueryExplorer(args.db) as explorer:
+            if args.db == ":memory:" or args.seed:
+                explorer.seed_sample_data()
+            target_module = args.module.strip().upper()
+            payload = {
+                "departments": explorer.department_summary(),
+                "modules": explorer.module_statistics(),
+                "weighted_ranking": explorer.top_students_by_weighted_average(min_credits=20),
+                "query_plan_cm2102": explorer.explain_module_mark_lookup(target_module, 70),
+                "mark_distribution": {target_module: explorer.module_mark_distribution(target_module)},
+            }
+            print(json.dumps(payload, indent=2))
+        return 0
+    except (ValueError, sqlite3.Error, OSError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
